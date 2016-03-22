@@ -11,26 +11,26 @@ CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
 
 async def repeater(repeat_q, replay_q, rate):
     """
-
+    中继器
     :param repeat_q:
     :param replay_q:
     :param rate:
     :return:
     """
     while 1:
-        params = await repeat_q.get()
-        loop_rate = rate
-        while loop_rate > 0:
-            if loop_rate >= 1:
-                replay_q.put_nowait(params)
+        parameters = await repeat_q.get()
+        loop = rate
+        while loop > 0:
+            if loop >= 1:
+                replay_q.put_nowait(parameters)
             else:
                 r = random.random()
                 if r <= rate:
-                    replay_q.put_nowait(params)
-            loop_rate -= 1
+                    replay_q.put_nowait(parameters)
+            loop -= 1
 
 
-async def request(method, url, **kwargs):
+async def request(client, method, url, **kwargs):
     """
     http请求函数
     :param method:
@@ -38,11 +38,7 @@ async def request(method, url, **kwargs):
     :param kwargs:
     :return:
     """
-    session = kwargs.pop('client', None)
-    if session is None:
-        global CLIENT
-        session = CLIENT
-    async with session.request(method, url) as response:
+    async with client.request(method, url, **kwargs) as response:
         return await response.read()
 
 
@@ -55,5 +51,10 @@ async def player(q):
     global EVENT_LOOP
     client = aiohttp.ClientSession(loop=EVENT_LOOP)
     while 1:
-        url = await q.get()
-        await request('get', url, client=client)
+        parameters = await q.get()
+        method = parameters.pop('method')
+        url = parameters.pop('url')
+        params = parameters.pop('param', None)
+        data = parameters.pop('data', None)
+        headers = parameters.pop('headers', None)
+        await request(client, method, url, params=params, data=data, headers=headers, **parameters)
