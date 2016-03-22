@@ -15,14 +15,12 @@ def main(log_file=None, rate=1, log_cutter=None, request_parser=None):
     :return:
     """
 
-    # if not os.path.isfile(log_file):
-    #     raise IOError("cannot find log file: {}".format(log_file))
-    rate = 3
+    if not os.path.isfile(log_file):
+        raise IOError("cannot find log file: {}".format(log_file))
 
-    [asyncio.ensure_future(repeater(REPEAT_QUEUE, REPLAY_QUEUE, 3)) for i in range(config.REPEATER_NUMBER)]
+    [asyncio.ensure_future(repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate)) for _ in range(config.REPEATER_NUMBER)]
+    [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
 
-    for x in range(config.PLAYER_NUMBER):
-        asyncio.ensure_future(player(REPLAY_QUEUE))
     EVENT_LOOP.set_default_executor(ThreadPoolExecutor(5))
     EVENT_LOOP.run_forever()
 
