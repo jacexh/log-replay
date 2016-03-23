@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from .config import GATHER_INTERVAL
-from .core import REPEAT_QUEUE, EVENT_LOOP
+from .core import REPEAT_QUEUE
 
 
 class LogParser(object):
@@ -44,7 +44,6 @@ class ParserThread(threading.Thread):
         self.file_encoding = file_encoding
 
     def run(self):
-        EVENT_LOOP.call_soon_threadsafe(lambda: print(self.out_q.qsize()))
         last_gather_ts = None
         diff_ts = None  # 回放时间与原记录时间差
 
@@ -58,7 +57,9 @@ class ParserThread(threading.Thread):
 
                 if GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
                     self.logger.info("GATHER_INTERVAL eq 0")
-                    self.out_q.put_nowait(parsed.obj_to_dict())
+                    self.logger.info("put an item into REPEAT_QUEUE")
+                    self.logger.debug(parsed.obj_to_dict())
+                    self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                 else:
                     if parsed.request_start_timestamp is None:
                         raise ValueError("if set GATHER_INTERVAL not eq 0, must specify the `request_start_timestamp` "
@@ -66,13 +67,14 @@ class ParserThread(threading.Thread):
                     if last_gather_ts is None:  # 取到第一条匹配的请求日志, 回放开始
                         last_gather_ts = parsed.request_start_timestamp
                         diff_ts = int(time.time() * 1000) - last_gather_ts
-                        self.logger.info("replay log from {}; data: {}".format(last_gather_ts, parsed.obj_to_dict()))
-                        self.out_q.put_nowait(parsed.obj_to_dict())
+                        self.logger.info("put an item into REPEAT_QUEUE")
+                        self.logger.debug(parsed.obj_to_dict())
+                        self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                     else:
-                        if parsed.request_start_timestamp - last_gather_ts < GATHER_INTERVAL * 1000:
-                            self.logger.info("{} : {}".format(parsed.request_start_timestamp, parsed.obj_to_dict()))
-                            self.logger.info("queue size: {}".format(self.out_q.qsize()))
-                            self.out_q.put_nowait(parsed.obj_to_dict())
+                        if parsed.request_start_timestamp - last_gather_ts <= GATHER_INTERVAL * 1000:
+                            self.logger.info("put an item into REPEAT_QUEUE")
+                            self.logger.debug(parsed.obj_to_dict())
+                            self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                         else:
                             while 1:
                                 self.logger.info("will take a sleep in {} seconds".format(GATHER_INTERVAL))
@@ -80,14 +82,13 @@ class ParserThread(threading.Thread):
                                 last_gather_ts = int(time.time()*1000) - diff_ts
                                 self.logger.info("refreshed `last_gather_ts`: {}".format(last_gather_ts))
                                 if parsed.request_start_timestamp - last_gather_ts < GATHER_INTERVAL * 1000:
-                                    self.logger.info("{} : {}".format(parsed.request_start_timestamp, parsed.obj_to_dict()))
-                                    self.logger.info("queue size: {}".format(self.out_q.qsize()))
-                                    self.out_q.put_nowait(parsed.obj_to_dict())
+                                    self.logger.info("put an item into REPEAT_QUEUE")
+                                    self.logger.debug(parsed.obj_to_dict())
+                                    self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                                     break
 
         self.logger.info("read complete")
-        while not self.out_q.empty():
+        while not self.out_q.async_q.empty():
             time.sleep(.1)
         else:
-            self.out_q.stop()
             self.out_q.close()
