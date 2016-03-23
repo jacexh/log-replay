@@ -33,7 +33,7 @@ class LogParser(object):
 
 class ParserThread(threading.Thread):
 
-    def __init__(self, log_file, log_parser):
+    def __init__(self, log_file, log_parser, file_encoding='utf-8'):
         super(ParserThread, self).__init__()
         if not issubclass(log_parser, LogParser):
             raise TypeError
@@ -41,13 +41,14 @@ class ParserThread(threading.Thread):
         self.log_parser = log_parser
         self.out_q = REPEAT_QUEUE
         self.logger = logging.getLogger(__name__)
+        self.file_encoding = file_encoding
 
     def run(self):
         EVENT_LOOP.call_soon_threadsafe(lambda: print(self.out_q.qsize()))
         last_gather_ts = None
         diff_ts = None  # 回放时间与原记录时间差
 
-        with open(self.log_file, "r", encoding="utf-8") as f:
+        with open(self.log_file, "r", encoding=self.file_encoding) as f:
 
             for line in f.readlines():
                 parsed = self.log_parser(line)
