@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from .config import GATHER_INTERVAL
-from .core import REPEAT_QUEUE
+from .core import REPEAT_QUEUE, EVENT_LOOP
 
 
 class LogParser(object):
@@ -43,10 +43,11 @@ class ParserThread(threading.Thread):
         self.logger = logging.getLogger(__name__)
 
     def run(self):
+        EVENT_LOOP.call_soon_threadsafe(lambda: print(self.out_q.qsize()))
         last_gather_ts = None
         diff_ts = None  # 回放时间与原记录时间差
 
-        with open(self.log_file, "r") as f:
+        with open(self.log_file, "r", encoding="utf-8") as f:
 
             for line in f.readlines():
                 parsed = self.log_parser(line)
@@ -64,17 +65,24 @@ class ParserThread(threading.Thread):
                     if last_gather_ts is None:  # 取到第一条匹配的请求日志, 回放开始
                         last_gather_ts = parsed.request_start_timestamp
                         diff_ts = int(time.time() * 1000) - last_gather_ts
-                        self.logger.info("replay log from {}".format(last_gather_ts))
+                        self.logger.info("replay log from {}; data: {}".format(last_gather_ts, parsed.obj_to_dict()))
                         self.out_q.put_nowait(parsed.obj_to_dict())
                     else:
                         if parsed.request_start_timestamp - last_gather_ts < GATHER_INTERVAL * 1000:
-                            self.logger.info("{}".format(parsed.request_start_timestamp))
+                            self.logger.info("{} : {}".format(parsed.request_start_timestamp, parsed.obj_to_dict()))
+                            self.logger.info("queue size: {}".format(self.out_q.qsize()))
                             self.out_q.put_nowait(parsed.obj_to_dict())
                         else:
-                            self.logger.info("will take a sleep in {} seconds".format(GATHER_INTERVAL))
-                            time.sleep(GATHER_INTERVAL)
-                            last_gather_ts = int(time.time()*1000) - diff_ts
-                            self.logger.info("refreshed `last_gather_ts`: {}".format(last_gather_ts))
+                            while 1:
+                                self.logger.info("will take a sleep in {} seconds".format(GATHER_INTERVAL))
+                                time.sleep(GATHER_INTERVAL)
+                                last_gather_ts = int(time.time()*1000) - diff_ts
+                                self.logger.info("refreshed `last_gather_ts`: {}".format(last_gather_ts))
+                                if parsed.request_start_timestamp - last_gather_ts < GATHER_INTERVAL * 1000:
+                                    self.logger.info("{} : {}".format(parsed.request_start_timestamp, parsed.obj_to_dict()))
+                                    self.logger.info("queue size: {}".format(self.out_q.qsize()))
+                                    self.out_q.put_nowait(parsed.obj_to_dict())
+                                    break
 
         self.logger.info("read complete")
         while not self.out_q.empty():

@@ -20,8 +20,11 @@ def main(log_file=None, rate=1, log_parser=None):
 
     ParserThread(log_file, log_parser).start()
 
-    [asyncio.ensure_future(repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate)) for _ in range(config.REPEATER_NUMBER)]
-    [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
+    EVENT_LOOP.create_task(repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate))
+    EVENT_LOOP.create_task(player(REPLAY_QUEUE))
 
-    EVENT_LOOP.set_default_executor(ThreadPoolExecutor(config.THREAD_POOL_NUMBER))
+    # [asyncio.ensure_future(repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate)) for _ in range(config.REPEATER_NUMBER)]
+    # [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
+
+    # EVENT_LOOP.set_default_executor(ThreadPoolExecutor(config.THREAD_POOL_NUMBER))
     EVENT_LOOP.run_forever()

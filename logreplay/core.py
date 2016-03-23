@@ -1,12 +1,14 @@
 import asyncio
 import aiohttp
 import random
+import logging
 
 
 EVENT_LOOP = asyncio.get_event_loop()
-REPLAY_QUEUE = asyncio.Queue()  # 回放队列,生产者为中继器,消费者将会生成的异步请求
-REPEAT_QUEUE = asyncio.Queue()  # 中继队列,消费者为中继器,用于更改请求量
-CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
+REPLAY_QUEUE = asyncio.Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
+REPEAT_QUEUE = asyncio.Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
+# CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
+LOGGER = logging.getLogger(__name__)
 
 
 async def repeater(repeat_q, replay_q, rate):
@@ -19,6 +21,7 @@ async def repeater(repeat_q, replay_q, rate):
     """
     while 1:
         parameters = await repeat_q.get()
+        LOGGER.info(parameters)
         loop = rate
         while loop > 0:
             if loop >= 1:
@@ -52,9 +55,10 @@ async def player(q):
     client = aiohttp.ClientSession(loop=EVENT_LOOP)
     while 1:
         parameters = await q.get()
-        method = parameters.pop('method')
-        url = parameters.pop('url')
+        LOGGER.info(parameters)
+        method = parameters.pop('method', 'get')
+        url = parameters.pop('url', None)
         params = parameters.pop('param', None)
-        data = parameters.pop('data', None)
+        data = parameters.pop('body', None)
         headers = parameters.pop('headers', None)
         await request(client, method, url, params=params, data=data, headers=headers, **parameters)
