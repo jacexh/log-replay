@@ -88,7 +88,4 @@ class ParserThread(threading.Thread):
                                     break
 
         self.logger.info("read complete")
-        while not self.out_q.async_q.empty():
-            time.sleep(.1)
-        else:
-            self.out_q.close()
+
