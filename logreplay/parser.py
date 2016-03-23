@@ -1,7 +1,7 @@
 import time
 import threading
 import logging
-from .config import GATHER_INTERVAL
+from .config import config
 from .core import REPEAT_QUEUE
 
 
@@ -55,7 +55,7 @@ class ParserThread(threading.Thread):
                 if not parsed.is_matched:  # 当该行并非请求日志时,不处理
                     continue
 
-                if GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
+                if config.GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
                     self.logger.info("GATHER_INTERVAL eq 0")
                     self.logger.info("put an item into REPEAT_QUEUE")
                     self.logger.debug(parsed.obj_to_dict())
@@ -71,17 +71,17 @@ class ParserThread(threading.Thread):
                         self.logger.debug(parsed.obj_to_dict())
                         self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                     else:
-                        if parsed.request_start_timestamp - last_gather_ts <= GATHER_INTERVAL * 1000:
+                        if parsed.request_start_timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
                             self.logger.info("put an item into REPEAT_QUEUE")
                             self.logger.debug(parsed.obj_to_dict())
                             self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                         else:
                             while 1:
-                                self.logger.info("will take a sleep in {} seconds".format(GATHER_INTERVAL))
-                                time.sleep(GATHER_INTERVAL)
+                                self.logger.info("will take a sleep in {} seconds".format(config.GATHER_INTERVAL))
+                                time.sleep(config.GATHER_INTERVAL)
                                 last_gather_ts = int(time.time()*1000) - diff_ts
                                 self.logger.info("refreshed `last_gather_ts`: {}".format(last_gather_ts))
-                                if parsed.request_start_timestamp - last_gather_ts < GATHER_INTERVAL * 1000:
+                                if parsed.request_start_timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
                                     self.logger.info("put an item into REPEAT_QUEUE")
                                     self.logger.debug(parsed.obj_to_dict())
                                     self.out_q.async_q.put_nowait(parsed.obj_to_dict())

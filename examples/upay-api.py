@@ -31,4 +31,5 @@ class APIParser(logreplay.LogParser):
 
 
 if __name__ == "__main__":
+    logreplay.config.GATHER_INTERVAL = 1
     logreplay.main(record, APIParser, 2)

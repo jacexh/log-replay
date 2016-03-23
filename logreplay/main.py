@@ -1,9 +1,9 @@
 import os
 import asyncio
-from logreplay import config
-from logreplay.core import EVENT_LOOP, REPEAT_QUEUE, REPLAY_QUEUE, player, repeater, EXECUTOR
-from logreplay.parser import ParserThread
-from logreplay.monitor import MonitorThread
+from .config import config
+from .core import EVENT_LOOP, REPEAT_QUEUE, REPLAY_QUEUE, player, repeater, EXECUTOR
+from .parser import ParserThread
+from .monitor import MonitorThread
 
 
 def main(log_file, log_parser, rate=1, file_encoding="utf-8"):

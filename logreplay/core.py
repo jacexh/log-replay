@@ -3,14 +3,14 @@ import aiohttp
 import random
 import logging
 import janus
-from .config import THREAD_POOL_NUMBER
+from .config import config
 from concurrent.futures import ThreadPoolExecutor
 
 
 EVENT_LOOP = asyncio.get_event_loop()
 REPLAY_QUEUE = janus.Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
 REPEAT_QUEUE = janus.Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
-EXECUTOR = ThreadPoolExecutor(THREAD_POOL_NUMBER)
+EXECUTOR = ThreadPoolExecutor(config.THREAD_POOL_NUMBER)
 CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
 LOGGER = logging.getLogger(__name__)
 
