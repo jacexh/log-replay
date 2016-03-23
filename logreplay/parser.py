@@ -75,3 +75,10 @@ class ParserThread(threading.Thread):
                             time.sleep(GATHER_INTERVAL)
                             last_gather_ts = int(time.time()*1000) - diff_ts
                             self.logger.info("refreshed `last_gather_ts`: {}".format(last_gather_ts))
+
+        self.logger.info("read complete")
+        while not self.out_q.empty():
+            time.sleep(.1)
+        else:
+            self.out_q.stop()
+            self.out_q.close()
