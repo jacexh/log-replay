@@ -1,6 +1,5 @@
-from logreplay.parser import LogParser
-from logreplay.main import main
 import json
+import logreplay
 from dateutil.parser import parse
 import logging
 
@@ -10,7 +9,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s- %(n
 record = "./api.log"
 
 
-class APIParser(LogParser):
+class APIParser(logreplay.LogParser):
 
     def parse(self):
         j = json.loads(self.content)
@@ -32,4 +31,4 @@ class APIParser(LogParser):
 
 
 if __name__ == "__main__":
-    main(record, APIParser, 2)
+    logreplay.main(record, APIParser, 2)
