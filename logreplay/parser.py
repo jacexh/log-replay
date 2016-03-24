@@ -46,6 +46,7 @@ class ParserThread(threading.Thread):
     def run(self):
         last_gather_ts = None
         diff_ts = None  # 回放时间与原记录时间差
+        matched_records_in_cycle = 0
 
         with open(self.log_file, "r", encoding=self.file_encoding) as f:
 
@@ -56,8 +57,6 @@ class ParserThread(threading.Thread):
                     continue
 
                 if config.GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
-                    self.logger.info("GATHER_INTERVAL eq 0")
-                    self.logger.info("put an item into REPEAT_QUEUE")
                     self.logger.debug(parsed.obj_to_dict())
                     self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                 else:
@@ -67,22 +66,24 @@ class ParserThread(threading.Thread):
                     if last_gather_ts is None:  # 取到第一条匹配的请求日志, 回放开始
                         last_gather_ts = parsed.request_start_timestamp
                         diff_ts = int(time.time() * 1000) - last_gather_ts
-                        self.logger.info("put an item into REPEAT_QUEUE")
+                        matched_records_in_cycle += 1
                         self.logger.debug(parsed.obj_to_dict())
                         self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                     else:
                         if parsed.request_start_timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
-                            self.logger.info("put an item into REPEAT_QUEUE")
                             self.logger.debug(parsed.obj_to_dict())
+                            matched_records_in_cycle += 1
                             self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                         else:
                             while 1:
-                                self.logger.info("will take a sleep in {} seconds".format(config.GATHER_INTERVAL))
+                                self.logger.info("gathered {} records in {} seconds".format(
+                                    matched_records_in_cycle, config.GATHER_INTERVAL))
                                 time.sleep(config.GATHER_INTERVAL)
                                 last_gather_ts = int(time.time()*1000) - diff_ts
-                                self.logger.info("refreshed `last_gather_ts`: {}".format(last_gather_ts))
+                                matched_records_in_cycle = 0
+
                                 if parsed.request_start_timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
-                                    self.logger.info("put an item into REPEAT_QUEUE")
+                                    matched_records_in_cycle += 1
                                     self.logger.debug(parsed.obj_to_dict())
                                     self.out_q.async_q.put_nowait(parsed.obj_to_dict())
                                     break

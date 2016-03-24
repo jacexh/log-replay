@@ -38,5 +38,4 @@ class MonitorThread(threading.Thread):
         try:
             EVENT_LOOP.close()
         except RuntimeError:
-            pass  #
-
+            self.logger.warning("close event loop fail, press CTRL+C to shutdown log-replay")
