@@ -23,13 +23,8 @@ def main(log_file, log_parser, rate=1, file_encoding="utf-8"):
     pt.start()
     MonitorThread(pt).start()
 
-    # tasks = [repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate) for _ in range(config.REPEATER_NUMBER)]
-    # tasks.extend([player(REPLAY_QUEUE) for _ in range(config.PLAYER_NUMBER)])
     [asyncio.ensure_future(repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate)) for _ in range(config.REPEATER_NUMBER)]
     [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
 
     EVENT_LOOP.set_default_executor(EXECUTOR)
     EVENT_LOOP.run_forever()
-    # EVENT_LOOP.run_until_complete(asyncio.wait(tasks))
-    # EVENT_LOOP.close()
-
