@@ -45,6 +45,7 @@ async def request(client, method, url, **kwargs):
     :return:
     """
     async with client.request(method, url, **kwargs) as response:
+        assert response.status == 200
         return await response.read()
 
 
