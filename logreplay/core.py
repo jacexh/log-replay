@@ -5,6 +5,7 @@ import logging
 import janus
 from .config import config
 from concurrent.futures import ThreadPoolExecutor
+import timeit
 
 
 EVENT_LOOP = asyncio.get_event_loop()
@@ -44,9 +45,25 @@ async def request(client, method, url, **kwargs):
     :param kwargs:
     :return:
     """
+    if config.RESPONSE_HANDLER is not None:
+        future = asyncio.Future()
+        future.add_done_callback(config.RESPONSE_HANDLER)
+    start = timeit.default_timer()
     async with client.request(method, url, **kwargs) as response:
-        assert response.status == 200
-        return await response.read()
+        content = await response.text()
+        r = dict(
+            request=dict(url=url, method=method, paramenters=kwargs),
+            response=dict(
+                status_code=response.status,
+                content=content,
+                elapsed=timeit.default_timer()-start,
+                host=response.host,
+                method=response.method,
+                url=response.url,
+                cokkies=response.cookies
+            ))
+        if config.RESPONSE_HANDLER is not None:
+            future.set_result(r)
 
 
 async def player(q):
