@@ -32,4 +32,4 @@ class APIParser(logreplay.LogParser):
 
 if __name__ == "__main__":
     logreplay.config.GATHER_INTERVAL = 3
-    logreplay.main(record, APIParser, 2.3)
+    logreplay.main(record, APIParser, 2.3, callback=lambda p: print(json.dumps(p.result())))
