@@ -6,7 +6,7 @@ from .parser import ParserThread
 from .monitor import MonitorThread
 
 
-def main(log_file, log_parser, rate=1, file_encoding="utf-8"):
+def main(log_file, log_parser, rate=1, file_encoding="utf-8", callback=None):
     """
     logreplay主函数
     :param log_file: 日志文件
@@ -18,6 +18,9 @@ def main(log_file, log_parser, rate=1, file_encoding="utf-8"):
 
     if not os.path.isfile(log_file):
         raise IOError("cannot find log file: {}".format(log_file))
+
+    if callback is not None:
+        config.RESPONSE_HANDLER = callback
 
     pt = ParserThread(log_file, log_parser, file_encoding=file_encoding)
     pt.start()
