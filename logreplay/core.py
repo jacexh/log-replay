@@ -60,7 +60,7 @@ async def request(client, method, url, **kwargs):
                 host=response.host,
                 method=response.method,
                 url=response.url,
-                cokkies=response.cookies
+                cookies=response.cookies
             ))
         if config.RESPONSE_HANDLER is not None:
             future.set_result(r)
