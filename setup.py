@@ -5,7 +5,7 @@ except ImportError:
 
 setup(
     name='logreplay',
-    version=open('version', 'r').read().strip(),
+    version="0.0.8",
     packages=['logreplay'],
     url='https://github.com/jacexh/log-replay',
     license='MIT',
@@ -21,6 +21,5 @@ setup(
     install_requires=[
         "aiohttp",
         "janus"
-    ],
-    long_description=open('README.md', 'r', encoding="utf-8").read()
+    ]
 )
