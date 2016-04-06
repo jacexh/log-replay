@@ -7,7 +7,7 @@ setup(
     name='logreplay',
     version=open('version', 'r').read().strip(),
     packages=['logreplay'],
-    url='',
+    url='https://github.com/jacexh/log-replay',
     license='MIT',
     author='jace',
     author_email='jace@xuh.me',
@@ -21,5 +21,6 @@ setup(
     install_requires=[
         "aiohttp",
         "janus"
-    ]
+    ],
+    long_description=open('README.md', 'r', encoding="utf-8").read()
 )
