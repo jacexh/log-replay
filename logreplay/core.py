@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 import random
+import copy
 import logging
 import janus
 from .config import config
@@ -30,18 +31,18 @@ async def repeater(repeat_q, replay_q, rate):
         while loop > 0:
             if loop >= 1:
                 if config.REPEATER_HANDLER is not None:
-                    handled_params = config.REPEATER_HANDLER(parameters.copy())
+                    handled_params = config.REPEATER_HANDLER(copy.deepcopy(parameters))
                     replay_q.async_q.put_nowait(handled_params)
                 else:
-                    replay_q.async_q.put_nowait(parameters.copy())
+                    replay_q.async_q.put_nowait(copy.deepcopy(parameters))
             else:
                 r = random.random()
                 if r <= rate:
                     if config.REPEATER_HANDLER is not None:
-                        handled_params = config.REPEATER_HANDLER(parameters.copy())
+                        handled_params = config.REPEATER_HANDLER(copy.deepcopy(parameters))
                         replay_q.async_q.put_nowait(handled_params)
                     else:
-                        replay_q.async_q.put_nowait(parameters.copy())
+                        replay_q.async_q.put_nowait(copy.deepcopy(parameters))
             loop -= 1
 
 
