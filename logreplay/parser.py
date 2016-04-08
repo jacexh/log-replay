@@ -51,29 +51,29 @@ class ParserThread(threading.Thread):
         with open(self.log_file, "r", encoding=self.file_encoding) as f:
 
             for line in f.readlines():
-                parsed = self.log_parser(line)
-                parsed.parse()
-                if not parsed.is_matched:  # 当该行并非请求日志时,不处理
+                parser = self.log_parser(line)
+                parser.parse()
+                if not parser.is_matched:  # 当该行并非请求日志时,不处理
                     continue
 
                 if config.GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
-                    self.logger.debug(parsed.obj_to_dict())
-                    self.out_q.async_q.put_nowait(parsed.obj_to_dict())
+                    self.logger.debug(parser.obj_to_dict())
+                    self.out_q.async_q.put_nowait(parser.obj_to_dict())
                 else:
-                    if parsed.request_start_timestamp is None:
+                    if parser.request_start_timestamp is None:
                         raise ValueError("if set GATHER_INTERVAL not eq 0, must specify the `request_start_timestamp` "
                                          "in `parse()`")
                     if last_gather_ts is None:  # 取到第一条匹配的请求日志, 回放开始
-                        last_gather_ts = parsed.request_start_timestamp
+                        last_gather_ts = parser.request_start_timestamp
                         diff_ts = int(time.time() * 1000) - last_gather_ts
                         matched_records_in_cycle += 1
-                        self.logger.debug(parsed.obj_to_dict())
-                        self.out_q.async_q.put_nowait(parsed.obj_to_dict())
+                        self.logger.debug(parser.obj_to_dict())
+                        self.out_q.async_q.put_nowait(parser.obj_to_dict())
                     else:
-                        if parsed.request_start_timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
-                            self.logger.debug(parsed.obj_to_dict())
+                        if parser.request_start_timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
+                            self.logger.debug(parser.obj_to_dict())
                             matched_records_in_cycle += 1
-                            self.out_q.async_q.put_nowait(parsed.obj_to_dict())
+                            self.out_q.async_q.put_nowait(parser.obj_to_dict())
                         else:
                             while 1:
                                 self.logger.info("gathered {} records in {} seconds".format(
@@ -82,10 +82,10 @@ class ParserThread(threading.Thread):
                                 last_gather_ts = int(time.time()*1000) - diff_ts
                                 matched_records_in_cycle = 0
 
-                                if parsed.request_start_timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
+                                if parser.request_start_timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
                                     matched_records_in_cycle += 1
-                                    self.logger.debug(parsed.obj_to_dict())
-                                    self.out_q.async_q.put_nowait(parsed.obj_to_dict())
+                                    self.logger.debug(parser.obj_to_dict())
+                                    self.out_q.async_q.put_nowait(parser.obj_to_dict())
                                     break
 
         self.logger.info("read complete")
