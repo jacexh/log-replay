@@ -30,14 +30,18 @@ async def repeater(repeat_q, replay_q, rate):
         while loop > 0:
             if loop >= 1:
                 if config.REPEATER_HANDLER is not None:
-                    parameters = config.REPEATER_HANDLER(parameters.copy())
-                replay_q.async_q.put_nowait(parameters.copy())
+                    handled_params = config.REPEATER_HANDLER(parameters.copy())
+                    replay_q.async_q.put_nowait(handled_params)
+                else:
+                    replay_q.async_q.put_nowait(parameters.copy())
             else:
                 r = random.random()
                 if r <= rate:
                     if config.REPEATER_HANDLER is not None:
-                        parameters = config.REPEATER_HANDLER(parameters.copy())
-                    replay_q.async_q.put_nowait(parameters.copy())
+                        handled_params = config.REPEATER_HANDLER(parameters.copy())
+                        replay_q.async_q.put_nowait(handled_params)
+                    else:
+                        replay_q.async_q.put_nowait(parameters.copy())
             loop -= 1
 
 
