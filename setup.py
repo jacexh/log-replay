@@ -3,9 +3,11 @@ try:
 except ImportError:
     from distutils.core import setup
 
+from logreplay import __version__
+
 setup(
     name='logreplay',
-    version="0.0.8",
+    version=__version__,
     packages=['logreplay'],
     url='https://github.com/jacexh/log-replay',
     license='MIT',
