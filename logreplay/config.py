@@ -5,3 +5,4 @@ class config(object):
     THREAD_POOL_NUMBER = 5
     GATHER_INTERVAL = 10
     RESPONSE_HANDLER = None
+    REPEATER_HANDLER = None

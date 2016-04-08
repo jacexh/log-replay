@@ -5,7 +5,7 @@ except ImportError:
 
 setup(
     name='logreplay',
-    version="0.0.8",
+    version='0.1.0',
     packages=['logreplay'],
     url='https://github.com/jacexh/log-replay',
     license='MIT',

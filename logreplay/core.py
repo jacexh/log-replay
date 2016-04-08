@@ -29,11 +29,19 @@ async def repeater(repeat_q, replay_q, rate):
         loop = rate
         while loop > 0:
             if loop >= 1:
-                replay_q.async_q.put_nowait(parameters.copy())
+                if config.REPEATER_HANDLER is not None:
+                    handled_params = config.REPEATER_HANDLER(parameters.copy())
+                    replay_q.async_q.put_nowait(handled_params)
+                else:
+                    replay_q.async_q.put_nowait(parameters.copy())
             else:
                 r = random.random()
                 if r <= rate:
-                    replay_q.async_q.put_nowait(parameters.copy())
+                    if config.REPEATER_HANDLER is not None:
+                        handled_params = config.REPEATER_HANDLER(parameters.copy())
+                        replay_q.async_q.put_nowait(handled_params)
+                    else:
+                        replay_q.async_q.put_nowait(parameters.copy())
             loop -= 1
 
 
@@ -52,7 +60,11 @@ async def request(client, method, url, **kwargs):
     async with client.request(method, url, **kwargs) as response:
         content = await response.text()
         r = dict(
-            request=dict(url=url, method=method, paramenters=kwargs),
+            request=dict(
+                url=url,
+                method=method,
+                parameters=kwargs
+            ),
             response=dict(
                 status_code=response.status,
                 content=content,
