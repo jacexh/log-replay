@@ -77,7 +77,7 @@ def md5_str(content):
     return m.hexdigest()
 
 
-class APIParse(logreplay.parser.LogParser):
+class APIParse(logreplay.LogParser):
 
     def parse(self):
         self.is_matched = True
