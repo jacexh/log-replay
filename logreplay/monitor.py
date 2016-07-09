@@ -23,8 +23,11 @@ class MonitorThread(threading.Thread):
         self.logger.info('send finish signal to REPEAT_QUEUE')
         event_loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, config.FINISHED_SIGNAL)
 
-        # close loop
-        self.logger.info('shutdown client and stop event loop')
+        self.logger.info("waiting for all tasks to complete")
+        while asyncio.Task.all_tasks(loop=event_loop):
+            time.sleep(.5)
 
+        # close loop
+        self.logger.info('stop event loop safety')
         event_loop.call_soon_threadsafe(CLIENT.close)
         event_loop.call_soon_threadsafe(event_loop.stop)
