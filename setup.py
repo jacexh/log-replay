@@ -5,13 +5,13 @@ except ImportError:
 
 setup(
     name='logreplay',
-    version='0.1.1',
+    version='0.2.0',
     packages=['logreplay'],
     url='https://github.com/jacexh/log-replay',
     license='MIT',
     author='jace',
     author_email='jace@xuh.me',
-    description='a tool to replay http request that collect from log file',
+    description='a log-based tool to replay http requests',
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
@@ -19,6 +19,6 @@ setup(
         "Programming Language :: Python :: 3.5",
     ],
     install_requires=[
-        "aiohttp"
+        "aiohttp",
     ]
 )
