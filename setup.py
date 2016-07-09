@@ -19,7 +19,6 @@ setup(
         "Programming Language :: Python :: 3.5",
     ],
     install_requires=[
-        "aiohttp",
-        "janus"
+        "aiohttp"
     ]
 )
