@@ -6,7 +6,7 @@ import logging
 import aiohttp
 from . import events
 from . import config
-from .parser import RequestInfo
+from .model import RequestInfo
 
 
 EVENT_LOOP = asyncio.get_event_loop()
@@ -27,7 +27,8 @@ async def repeater(rate):
         replay_rate = rate
 
         if request_info == config.FINISHED_SIGNAL:
-            REPEAT_QUEUE.put_nowait(request_info)  # notify the player to finish
+            for _ in range(int(round((config.PLAYER_NUMBER/config.REPEATER_NUMBER)+0.5))):
+                REPLAY_QUEUE.put_nowait(request_info)  # notify the player to finish
             LOGGER.info("repeat finished")
             break
 
@@ -39,17 +40,17 @@ async def repeater(rate):
             if replay_rate >= 1:
                 parameters = request_info.to_request_parameters()
                 events.repeat.fire(parameters=parameters)  # do not unpack parameters
-                REPEAT_QUEUE.put_nowait(parameters)
+                REPLAY_QUEUE.put_nowait(parameters)
             else:
                 r = random.random()
                 if r <= rate:
                     parameters = request_info.to_request_parameters()
                     events.repeat.fire(parameters=parameters)  # do not unpack parameters
-                    REPEAT_QUEUE.put_nowait(parameters)
+                    REPLAY_QUEUE.put_nowait(parameters)
             replay_rate -= 1
 
 
-async def request(client, method, url, **kwargs):
+async def request(method, url, **kwargs):
     """http请求函数
 
     :param method:
@@ -57,29 +58,26 @@ async def request(client, method, url, **kwargs):
     :param kwargs:
     :return:
     """
-    if config.RESPONSE_HANDLER is not None:
-        future = asyncio.Future()
-        future.add_done_callback(config.RESPONSE_HANDLER)
+    future = asyncio.Future()
+    if config.CALLBACK:
+        future.add_done_callback(config.CALLBACK)
+
     start = timeit.default_timer()
-    async with client.request(method, url, **kwargs) as response:
+    async with CLIENT.request(method, url, **kwargs) as response:
         content = await response.text()
-        r = dict(
-            request=dict(
-                url=url,
-                method=method,
-                parameters=kwargs
-            ),
+        result = dict(
+            request=kwargs,
             response=dict(
                 status_code=response.status,
                 content=content,
-                elapsed=timeit.default_timer()-start,
-                host=response.host,
+                latency=int((timeit.default_timer()-start)*1000),
                 method=response.method,
                 url=response.url,
+                headers=response.headers,
                 cookies=response.cookies
             ))
-        if config.RESPONSE_HANDLER is not None:
-            future.set_result(r)
+        if config.CALLBACK:
+            future.set_result(result)
 
 
 async def player():
@@ -102,6 +100,6 @@ async def player():
         data = parameters.pop('data', None)
         headers = parameters.pop('headers', None)
         try:
-            await request(CLIENT, method, url, params=params, data=data, headers=headers, **parameters)
+            await request(method, url, params=params, data=data, headers=headers, **parameters)
         except:
             pass

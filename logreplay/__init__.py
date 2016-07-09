@@ -1,3 +1,4 @@
 from .main import main
 from . import config
-from .parser import LogParser, RequestInfo
+from .parser import LogParser
+from .model import RequestInfo

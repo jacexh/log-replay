@@ -21,4 +21,3 @@ class EventHook:
 
 repeat = EventHook()  # arguments: parameters
 replay = EventHook()
-response = EventHook()

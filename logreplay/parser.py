@@ -7,24 +7,6 @@ from . import config
 from .core import REPEAT_QUEUE
 
 
-class RequestInfo:
-    url = None
-    method = "get"
-    headers = None
-    data = None
-    params = None
-    cookies = None
-    timestamp = None
-    is_matched = False
-
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-    def to_request_parameters(self):
-        return dict(url=self.url, method=self.method, headers=self.headers, data=self.data, params=self.params,
-                    cookies=self.cookies)
-
-
 class LogParser(metaclass=ABCMeta):
 
     @abstractmethod
