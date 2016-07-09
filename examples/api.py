@@ -7,6 +7,7 @@ import time
 import hashlib
 import logging
 import logreplay
+from logreplay import RequestInfo, events
 import random
 import string
 from pythonjsonlogger import jsonlogger
@@ -26,8 +27,8 @@ json_file_handler = logging.FileHandler(filename='replay.log', mode='w')
 json_file_handler.setFormatter(json_formatter)
 json_file_handler.setLevel(logging.DEBUG)
 
-console_handler = logging.FileHandler('run.log', mode='w')
-# console_handler = logging.StreamHandler()
+# console_handler = logging.FileHandler('run.log', mode='w')
+console_handler = logging.StreamHandler()
 console_formatter = logging.Formatter(thread_fmt)
 console_handler.setFormatter(console_formatter)
 console_handler.setLevel(logging.INFO)
@@ -79,36 +80,34 @@ def md5_str(content):
 
 class APIParse(logreplay.LogParser):
 
-    def parse(self):
-        self.is_matched = True
-        self.request_start_timestamp = int(self.content.strip())
-        self.request_method = 'post'
-        self.request_url = "http://115.29.177.36:8888/upay/v2/pay"
-        payload = dict(
-            dynamic_id=gen_rand_str(16, 'digit', prefix='13'),
-            subject="mocked order",
-            total_amount="1",
-            terminal_sn=TERMINAL_SN
-        )
-        self.request_body = payload
-        self.request_headers = {"Content-Type": "application/json"}
+    def parse(self, line):
+        info = RequestInfo(method="post", url="http://121.41.41.54:11116/upay/v2/pay")
+        info.is_matched = True
+        info.timestamp = int(line.strip())
+        info.data = dict(dynamic_id=gen_rand_str(16, 'digit', prefix='13'), subject="mocked order", total_amount="1", terminal_sn=TERMINAL_SN)
+        info.headers = {"Content-Type": "application/json"}
+        return info
 
 
-def repeater_handler(params):
+def repeater_handler(parameters):
     """支付网关2.0要求同一商户的client_sn不重复,通过简单的复制请求参数会导致client_sn冲突,无法进行交易"""
     client_sn = str(int(time.time() * 1000)) + gen_rand_str(4, 'digit')
-    body = params['body']
+    data = parameters['data']
 
-    body['client_sn'] = client_sn
-    body = json.dumps(body)
+    data['client_sn'] = client_sn
+    data = json.dumps(data)
 
-    params['body'] = body
-    params['headers']['Authorization'] = TERMINAL_SN + " " + md5_str(body + TERMINAL_KEY)
-    return params
+    parameters['data'] = data
+    parameters['headers']['Authorization'] = TERMINAL_SN + " " + md5_str(data + TERMINAL_KEY)
+    return parameters
+
+events.repeat += repeater_handler
 
 
-def callback(p):
-    REPLAY_LOGGER.debug("callback", extra=p.result())
+def callback(result):
+    ret = result.result()
+    ret["response"].pop("headers")
+    REPLAY_LOGGER.debug("call", extra=result.result())
 
 
 if __name__ == "__main__":
