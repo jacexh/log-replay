@@ -27,6 +27,7 @@ async def repeater(rate):
         replay_rate = rate
 
         if request_info == config.FINISHED_SIGNAL:
+            REPEAT_QUEUE.put_nowait(request_info)  # notify the player to finish
             LOGGER.info("repeat finished")
             break
 

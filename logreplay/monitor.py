@@ -1,7 +1,9 @@
 import logging
+import asyncio
 import threading
 import time
-from .core import EVENT_LOOP, REPLAY_QUEUE, REPEAT_QUEUE, EXECUTOR, CLIENT
+from . import config
+from .core import REPEAT_QUEUE, CLIENT
 
 
 class MonitorThread(threading.Thread):
@@ -16,26 +18,13 @@ class MonitorThread(threading.Thread):
             time.sleep(.5)
         self.logger.info("the monitored thread is dead")
 
-        # close REPEAT_QUEUE
-        while REPEAT_QUEUE.async_q.qsize():
-            time.sleep(.5)
-        else:
-            REPEAT_QUEUE.close()
-        self.logger.info("closed REPEAT_QUEUE")
-
-        # close REPLAY_QUEUE
-        while REPLAY_QUEUE.async_q.qsize():
-            time.sleep(.5)
-        else:
-            REPLAY_QUEUE.close()
-        self.logger.info("closed REPLAY_QUEUE")
+        event_loop = asyncio.get_event_loop()
+        # send finish signal to REPEAT_QUEUE
+        self.logger.info('send finish signal to REPEAT_QUEUE')
+        event_loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, config.FINISHED_SIGNAL)
 
         # close loop
-        EXECUTOR.shutdown(wait=True)
-        self.logger.info('shutdown executor')
-        CLIENT.close()
-        EVENT_LOOP.stop()
-        try:
-            EVENT_LOOP.close()
-        except RuntimeError:
-            self.logger.warning("close event loop fail, press CTRL+C to shutdown log-replay")
+        self.logger.info('shutdown client and stop event loop')
+
+        event_loop.call_soon_threadsafe(CLIENT.close)
+        event_loop.call_soon_threadsafe(event_loop.stop)

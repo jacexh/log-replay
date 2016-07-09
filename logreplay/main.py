@@ -24,14 +24,15 @@ def main(log_file, log_parser, rate=1, file_encoding="utf-8", callback=None):
     if callback is not None:
         config.RESPONSE_HANDLER = callback
 
-    pt = ParserThread(log_file, log_parser, file_encoding=file_encoding)
-    pt.start()
-    MonitorThread(pt).start()
-
     [asyncio.ensure_future(repeater(rate)) for _ in range(config.REPEATER_NUMBER)]
     [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
 
     event_loop = asyncio.get_event_loop()
     event_loop.set_default_executor(ThreadPoolExecutor(config.THREAD_POOL_NUMBER))
+
+    pt = ParserThread(log_file, log_parser, file_encoding=file_encoding)
+    pt.start()
+    MonitorThread(pt).start()
+
     event_loop.run_forever()
     event_loop.close()
