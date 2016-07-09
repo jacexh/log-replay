@@ -1,34 +1,23 @@
 import time
+import asyncio
 import threading
 import logging
-from .config import config
+from abc import abstractmethod, ABCMeta
+from . import config
 from .core import REPEAT_QUEUE
 
 
-class LogParser(object):
+class LogParser(metaclass=ABCMeta):
 
-    request_url = None
-    request_method = "get"
-    request_headers = None
-    request_body = None
-    request_start_timestamp = None  # unix时间戳,毫秒级
-    is_matched = False
+    @abstractmethod
+    def parse(self, line):
+        """Implement the method in subclass and return an instance of RequestInfo
 
-    def __init__(self, content):
-        self.content = content
-
-    def parse(self):
-        """
-        子类须实现该方法,如果记录匹配,必须修改is_matched为True
-        :return:
+        :param line: one line in log file
+        :type line: str
+        :return: an instance of RequestInfo
         """
         pass
-
-    def obj_to_dict(self):
-        if self.is_matched:
-            return dict(
-                url=self.request_url, method=self.request_method, body=self.request_body, headers=self.request_headers)
-        return {}
 
 
 class ParserThread(threading.Thread):
@@ -38,10 +27,10 @@ class ParserThread(threading.Thread):
         if not issubclass(log_parser, LogParser):
             raise TypeError
         self.log_file = log_file
-        self.log_parser = log_parser
-        self.out_q = REPEAT_QUEUE
+        self.log_parser = log_parser()
         self.logger = logging.getLogger(__name__)
         self.file_encoding = file_encoding
+        self.loop = asyncio.get_event_loop()
 
     def run(self):
         last_gather_ts = None
@@ -49,44 +38,42 @@ class ParserThread(threading.Thread):
         matched_records_in_cycle = 0
 
         with open(self.log_file, "r", encoding=self.file_encoding) as f:
-
             for line in f.readlines():
-                parser = self.log_parser(line)
-                parser.parse()
-                if not parser.is_matched:  # 当该行并非请求日志时,不处理
+                request_info = self.log_parser.parse(line)
+                if not request_info.is_matched:  # 当该行并非请求日志时,不处理
                     continue
 
                 if config.GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
-                    self.logger.debug(parser.obj_to_dict())
-                    self.out_q.async_q.put_nowait(parser.obj_to_dict())
+                    self.logger.debug(request_info)
+                    self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
                 else:
-                    if parser.request_start_timestamp is None:
-                        raise ValueError("if set GATHER_INTERVAL not eq 0, must specify the `request_start_timestamp` "
-                                         "in `parse()`")
+                    if request_info.timestamp is None:
+                        raise ValueError("if set GATHER_INTERVAL not eq 0, must specify the `timestamp` "
+                                         "in the instance of `RequestInfo`")
                     if last_gather_ts is None:  # 取到第一条匹配的请求日志, 回放开始
-                        last_gather_ts = parser.request_start_timestamp
+                        last_gather_ts = request_info.timestamp
                         diff_ts = int(time.time() * 1000) - last_gather_ts
                         matched_records_in_cycle += 1
-                        self.logger.debug(parser.obj_to_dict())
-                        self.out_q.async_q.put_nowait(parser.obj_to_dict())
-                    else:
-                        if parser.request_start_timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
-                            self.logger.debug(parser.obj_to_dict())
-                            matched_records_in_cycle += 1
-                            self.out_q.async_q.put_nowait(parser.obj_to_dict())
-                        else:
-                            while 1:
-                                self.logger.info("gathered {} records in {} seconds".format(
-                                    matched_records_in_cycle, config.GATHER_INTERVAL))
-                                time.sleep(config.GATHER_INTERVAL)
-                                last_gather_ts = int(time.time()*1000) - diff_ts
-                                matched_records_in_cycle = 0
+                        self.logger.debug(request_info)
+                        self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
+                        continue
 
-                                if parser.request_start_timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
-                                    matched_records_in_cycle += 1
-                                    self.logger.debug(parser.obj_to_dict())
-                                    self.out_q.async_q.put_nowait(parser.obj_to_dict())
-                                    break
+                    if request_info.timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
+                        self.logger.debug(request_info)
+                        matched_records_in_cycle += 1
+                        self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
+                    else:
+                        while 1:
+                            self.logger.info("gathered {} records in {} seconds".format(
+                                matched_records_in_cycle, config.GATHER_INTERVAL))
+                            time.sleep(config.GATHER_INTERVAL)
+                            last_gather_ts = int(time.time()*1000) - diff_ts
+                            matched_records_in_cycle = 0
+
+                            if request_info.timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
+                                matched_records_in_cycle += 1
+                                self.logger.debug(request_info)
+                                self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
+                                break
 
         self.logger.info("read complete")
-

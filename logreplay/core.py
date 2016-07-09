@@ -1,95 +1,105 @@
 import asyncio
-import aiohttp
-import random
-import copy
-import logging
-import janus
-from .config import config
-from concurrent.futures import ThreadPoolExecutor
 import timeit
+from asyncio import Queue
+import random
+import logging
+import aiohttp
+from . import events
+from . import config
+from .model import RequestInfo
 
 
 EVENT_LOOP = asyncio.get_event_loop()
-REPLAY_QUEUE = janus.Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
-REPEAT_QUEUE = janus.Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
-EXECUTOR = ThreadPoolExecutor(config.THREAD_POOL_NUMBER)
+REPLAY_QUEUE = Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
+REPEAT_QUEUE = Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
 CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
 LOGGER = logging.getLogger(__name__)
 
 
-async def repeater(repeat_q, replay_q, rate):
-    """
-    中继器
-    :param repeat_q:
-    :param replay_q:
+async def repeater(rate):
+    """中继器
+
     :param rate:
     :return:
     """
     while 1:
-        parameters = await repeat_q.async_q.get()
-        loop = rate
-        while loop > 0:
-            if loop >= 1:
-                if config.REPEATER_HANDLER is not None:
-                    handled_params = config.REPEATER_HANDLER(copy.deepcopy(parameters))
-                    replay_q.async_q.put_nowait(handled_params)
-                else:
-                    replay_q.async_q.put_nowait(copy.deepcopy(parameters))
+        request_info = await REPEAT_QUEUE.get()
+        replay_rate = rate
+
+        if request_info == config.FINISHED_SIGNAL:
+            for _ in range(int(round((config.PLAYER_NUMBER/config.REPEATER_NUMBER)+0.5))):
+                REPLAY_QUEUE.put_nowait(request_info)  # notify the player to finish
+            LOGGER.info("repeat finished")
+            break
+
+        if not isinstance(request_info, RequestInfo):
+            LOGGER.error("incorrect message in repeat queue: {}".format(request_info))
+            continue
+
+        while replay_rate > 0:
+            if replay_rate >= 1:
+                parameters = request_info.to_request_parameters()
+                events.repeat.fire(parameters=parameters)  # do not unpack parameters
+                REPLAY_QUEUE.put_nowait(parameters)
             else:
                 r = random.random()
                 if r <= rate:
-                    if config.REPEATER_HANDLER is not None:
-                        handled_params = config.REPEATER_HANDLER(copy.deepcopy(parameters))
-                        replay_q.async_q.put_nowait(handled_params)
-                    else:
-                        replay_q.async_q.put_nowait(copy.deepcopy(parameters))
-            loop -= 1
+                    parameters = request_info.to_request_parameters()
+                    events.repeat.fire(parameters=parameters)  # do not unpack parameters
+                    REPLAY_QUEUE.put_nowait(parameters)
+            replay_rate -= 1
 
 
-async def request(client, method, url, **kwargs):
-    """
-    http请求函数
+async def request(method, url, **kwargs):
+    """http请求函数
+
     :param method:
     :param url:
     :param kwargs:
     :return:
     """
-    if config.RESPONSE_HANDLER is not None:
-        future = asyncio.Future()
-        future.add_done_callback(config.RESPONSE_HANDLER)
+    future = asyncio.Future()
+    if config.CALLBACK:
+        future.add_done_callback(config.CALLBACK)
+
     start = timeit.default_timer()
-    async with client.request(method, url, **kwargs) as response:
+    async with CLIENT.request(method, url, **kwargs) as response:
         content = await response.text()
-        r = dict(
-            request=dict(
-                url=url,
-                method=method,
-                parameters=kwargs
-            ),
+        result = dict(
+            request=kwargs,
             response=dict(
                 status_code=response.status,
                 content=content,
-                elapsed=timeit.default_timer()-start,
-                host=response.host,
+                latency=int((timeit.default_timer()-start)*1000),
                 method=response.method,
                 url=response.url,
+                headers=response.headers,
                 cookies=response.cookies
             ))
-        if config.RESPONSE_HANDLER is not None:
-            future.set_result(r)
+        if config.CALLBACK:
+            future.set_result(result)
 
 
-async def player(q):
-    """
-    请求发送器
+async def player():
+    """请求发送器
+
     :param q:
     :return:
     """
     while 1:
-        parameters = await q.async_q.get()
+        parameters = await REPLAY_QUEUE.get()
+        if parameters == config.FINISHED_SIGNAL:
+            LOGGER.info("player finished")
+            break
+
+        events.replay.fire(parameters=parameters)
+
         method = parameters.pop('method', 'get')
-        url = parameters.pop('url')
-        params = parameters.pop('param', None)
-        data = parameters.pop('body', None)
+        url = parameters.pop('url', None)
+        params = parameters.pop('params', None)
+        data = parameters.pop('data', None)
         headers = parameters.pop('headers', None)
-        await request(CLIENT, method, url, params=params, data=data, headers=headers, **parameters)
+        try:
+            await request(method, url, params=params, data=data, headers=headers, **parameters)
+        except:
+            pass

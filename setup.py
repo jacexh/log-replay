@@ -11,7 +11,7 @@ setup(
     license='MIT',
     author='jace',
     author_email='jace@xuh.me',
-    description='a common log replay tool',
+    description='a tool to replay http request that collect from log file',
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Intended Audience :: Developers",
@@ -19,7 +19,6 @@ setup(
         "Programming Language :: Python :: 3.5",
     ],
     install_requires=[
-        "aiohttp",
-        "janus"
+        "aiohttp"
     ]
 )
