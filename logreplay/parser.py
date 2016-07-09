@@ -1,4 +1,5 @@
 import time
+import asyncio
 import threading
 import logging
 from abc import abstractmethod, ABCMeta
@@ -42,10 +43,10 @@ class ParserThread(threading.Thread):
         if not issubclass(log_parser, LogParser):
             raise TypeError
         self.log_file = log_file
-        self.log_parser = log_parser
-        self.out_q = REPEAT_QUEUE
+        self.log_parser = log_parser()
         self.logger = logging.getLogger(__name__)
         self.file_encoding = file_encoding
+        self.loop = asyncio.get_event_loop()
 
     def run(self):
         last_gather_ts = None
@@ -54,14 +55,13 @@ class ParserThread(threading.Thread):
 
         with open(self.log_file, "r", encoding=self.file_encoding) as f:
             for line in f.readlines():
-                parser = self.log_parser(line)
-                request_info = parser.parse()
+                request_info = self.log_parser.parse(line)
                 if not request_info.is_matched:  # 当该行并非请求日志时,不处理
                     continue
 
                 if config.GATHER_INTERVAL == 0:  # 不控制采集间隔的情况下, 不会控制回放的节奏
                     self.logger.debug(request_info)
-                    self.out_q.async_q.put_nowait(request_info)
+                    self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
                 else:
                     if request_info.timestamp is None:
                         raise ValueError("if set GATHER_INTERVAL not eq 0, must specify the `timestamp` "
@@ -71,13 +71,13 @@ class ParserThread(threading.Thread):
                         diff_ts = int(time.time() * 1000) - last_gather_ts
                         matched_records_in_cycle += 1
                         self.logger.debug(request_info)
-                        self.out_q.async_q.put_nowait(request_info)
+                        self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
                         continue
 
                     if request_info.timestamp - last_gather_ts <= config.GATHER_INTERVAL * 1000:
                         self.logger.debug(request_info)
                         matched_records_in_cycle += 1
-                        self.out_q.async_q.put_nowait(request_info)
+                        self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
                     else:
                         while 1:
                             self.logger.info("gathered {} records in {} seconds".format(
@@ -89,7 +89,7 @@ class ParserThread(threading.Thread):
                             if request_info.timestamp - last_gather_ts < config.GATHER_INTERVAL * 1000:
                                 matched_records_in_cycle += 1
                                 self.logger.debug(request_info)
-                                self.out_q.async_q.put_nowait(request_info)
+                                self.loop.call_soon_threadsafe(REPEAT_QUEUE.put_nowait, request_info)
                                 break
 
         self.logger.info("read complete")

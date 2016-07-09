@@ -1,49 +1,53 @@
 import asyncio
+from asyncio import Queue
 import aiohttp
 import random
 import copy
 import logging
-import janus
+from . import events
 from . import config
+from .parser import RequestInfo
 from concurrent.futures import ThreadPoolExecutor
 import timeit
 
 
 EVENT_LOOP = asyncio.get_event_loop()
-REPLAY_QUEUE = janus.Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
-REPEAT_QUEUE = janus.Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
+REPLAY_QUEUE = Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
+REPEAT_QUEUE = Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
 EXECUTOR = ThreadPoolExecutor(config.THREAD_POOL_NUMBER)
 CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
 LOGGER = logging.getLogger(__name__)
 
 
-async def repeater(repeat_q, replay_q, rate):
-    """
-    中继器
-    :param repeat_q:
-    :param replay_q:
+async def repeater(rate):
+    """中继器
+
     :param rate:
     :return:
     """
     while 1:
-        parameters = await repeat_q.async_q.get()
-        loop = rate
-        while loop > 0:
-            if loop >= 1:
-                if config.REPEATER_HANDLER is not None:
-                    handled_params = config.REPEATER_HANDLER(copy.deepcopy(parameters))
-                    replay_q.async_q.put_nowait(handled_params)
-                else:
-                    replay_q.async_q.put_nowait(copy.deepcopy(parameters))
+        request_info = await REPEAT_QUEUE.get()
+        replay_rate = rate
+
+        if request_info == config.FINISHED_SIGNAL:
+            LOGGER.info("repeat finished")
+            break
+
+        if not isinstance(request_info, RequestInfo):
+            continue
+
+        while replay_rate > 0:
+            if replay_rate >= 1:
+                parameters = request_info.to_request_parameters()
+                events.repeat.fire(parameters=parameters)  # do not unpack parameters
+                REPEAT_QUEUE.put_nowait(parameters)
             else:
                 r = random.random()
                 if r <= rate:
-                    if config.REPEATER_HANDLER is not None:
-                        handled_params = config.REPEATER_HANDLER(copy.deepcopy(parameters))
-                        replay_q.async_q.put_nowait(handled_params)
-                    else:
-                        replay_q.async_q.put_nowait(copy.deepcopy(parameters))
-            loop -= 1
+                    parameters = request_info.to_request_parameters()
+                    events.repeat.fire(parameters=parameters)  # do not unpack parameters
+                    REPEAT_QUEUE.put_nowait(parameters)
+            replay_rate -= 1
 
 
 async def request(client, method, url, **kwargs):
