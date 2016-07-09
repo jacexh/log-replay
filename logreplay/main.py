@@ -1,7 +1,8 @@
 import os
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from . import config
-from .core import EVENT_LOOP, REPEAT_QUEUE, REPLAY_QUEUE, player, repeater, EXECUTOR
+from .core import REPLAY_QUEUE, player, repeater
 from .parser import ParserThread
 from .monitor import MonitorThread
 
@@ -27,8 +28,10 @@ def main(log_file, log_parser, rate=1, file_encoding="utf-8", callback=None):
     pt.start()
     MonitorThread(pt).start()
 
-    [asyncio.ensure_future(repeater(REPEAT_QUEUE, REPLAY_QUEUE, rate)) for _ in range(config.REPEATER_NUMBER)]
+    [asyncio.ensure_future(repeater(rate)) for _ in range(config.REPEATER_NUMBER)]
     [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
 
-    EVENT_LOOP.set_default_executor(EXECUTOR)
-    EVENT_LOOP.run_forever()
+    event_loop = asyncio.get_event_loop()
+    event_loop.set_default_executor(ThreadPoolExecutor(config.THREAD_POOL_NUMBER))
+    event_loop.run_forever()
+    event_loop.close()

@@ -2,19 +2,16 @@ import asyncio
 from asyncio import Queue
 import aiohttp
 import random
-import copy
 import logging
 from . import events
 from . import config
 from .parser import RequestInfo
-from concurrent.futures import ThreadPoolExecutor
 import timeit
 
 
 EVENT_LOOP = asyncio.get_event_loop()
 REPLAY_QUEUE = Queue(loop=EVENT_LOOP)  # 回放队列,生产者为中继器,消费者将会生成的异步请求
 REPEAT_QUEUE = Queue(loop=EVENT_LOOP)  # 中继队列,消费者为中继器,用于更改请求量
-EXECUTOR = ThreadPoolExecutor(config.THREAD_POOL_NUMBER)
 CLIENT = aiohttp.ClientSession(loop=EVENT_LOOP)
 LOGGER = logging.getLogger(__name__)
 
