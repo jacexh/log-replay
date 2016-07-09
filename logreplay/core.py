@@ -1,12 +1,12 @@
 import asyncio
+import timeit
 from asyncio import Queue
-import aiohttp
 import random
 import logging
+import aiohttp
 from . import events
 from . import config
 from .parser import RequestInfo
-import timeit
 
 
 EVENT_LOOP = asyncio.get_event_loop()
@@ -32,6 +32,7 @@ async def repeater(rate):
             break
 
         if not isinstance(request_info, RequestInfo):
+            LOGGER.error("incorrect message in repeat queue: {}".format(request_info))
             continue
 
         while replay_rate > 0:
@@ -49,8 +50,8 @@ async def repeater(rate):
 
 
 async def request(client, method, url, **kwargs):
-    """
-    http请求函数
+    """http请求函数
+
     :param method:
     :param url:
     :param kwargs:
@@ -81,17 +82,26 @@ async def request(client, method, url, **kwargs):
             future.set_result(r)
 
 
-async def player(q):
-    """
-    请求发送器
+async def player():
+    """请求发送器
+
     :param q:
     :return:
     """
     while 1:
-        parameters = await q.async_q.get()
+        parameters = await REPLAY_QUEUE.get()
+        if parameters == config.FINISHED_SIGNAL:
+            LOGGER.info("player finished")
+            break
+
+        events.replay.fire(parameters=parameters)
+
         method = parameters.pop('method', 'get')
-        url = parameters.pop('url')
-        params = parameters.pop('param', None)
-        data = parameters.pop('body', None)
+        url = parameters.pop('url', None)
+        params = parameters.pop('params', None)
+        data = parameters.pop('data', None)
         headers = parameters.pop('headers', None)
-        await request(CLIENT, method, url, params=params, data=data, headers=headers, **parameters)
+        try:
+            await request(CLIENT, method, url, params=params, data=data, headers=headers, **parameters)
+        except:
+            pass

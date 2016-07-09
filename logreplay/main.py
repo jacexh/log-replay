@@ -2,7 +2,7 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from . import config
-from .core import REPLAY_QUEUE, player, repeater
+from .core import player, repeater
 from .parser import ParserThread
 from .monitor import MonitorThread
 
@@ -25,7 +25,7 @@ def main(log_file, log_parser, rate=1, file_encoding="utf-8", callback=None):
         config.RESPONSE_HANDLER = callback
 
     [asyncio.ensure_future(repeater(rate)) for _ in range(config.REPEATER_NUMBER)]
-    [asyncio.ensure_future(player(REPLAY_QUEUE)) for _ in range(config.PLAYER_NUMBER)]
+    [asyncio.ensure_future(player()) for _ in range(config.PLAYER_NUMBER)]
 
     event_loop = asyncio.get_event_loop()
     event_loop.set_default_executor(ThreadPoolExecutor(config.THREAD_POOL_NUMBER))
