@@ -1,7 +1,7 @@
 import time
 import threading
 import logging
-from .config import config
+from . import config
 from .core import REPEAT_QUEUE
 
 

@@ -4,7 +4,7 @@ import random
 import copy
 import logging
 import janus
-from .config import config
+from . import config
 from concurrent.futures import ThreadPoolExecutor
 import timeit
 

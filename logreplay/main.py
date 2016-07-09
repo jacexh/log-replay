@@ -1,6 +1,6 @@
 import os
 import asyncio
-from .config import config
+from . import config
 from .core import EVENT_LOOP, REPEAT_QUEUE, REPLAY_QUEUE, player, repeater, EXECUTOR
 from .parser import ParserThread
 from .monitor import MonitorThread
